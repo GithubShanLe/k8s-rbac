@@ -1,0 +1,195 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background-color: #f8f9fa;
+    margin: 0;
+    padding: 20px;
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 30px;
+    background: #fff;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+}
+
+h1 {
+    text-align: center;
+    color: #2c3e50;
+    margin-bottom: 30px;
+    font-weight: 600;
+}
+
+h2 {
+    color: #2c3e50;
+    margin: 25px 0 15px;
+    font-size: 1.5em;
+}
+
+form > div {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin: 0 0 8px;
+    color: #495057;
+    font-weight: 500;
+}
+
+input, select {
+    width: 10%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.15s ease-in-out;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+button {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+button[type="submit"] {
+    background: #007bff;
+    color: #fff;
+    width: 100%;
+    margin-top: 20px;
+}
+
+button[type="submit"]:hover {
+    background: #0056b3;
+}
+
+button[type="button"] {
+    background: #6c757d;
+    color: #fff;
+    padding: 6px 12px;
+    min-width: 32px;
+}
+
+button[type="button"]:hover {
+    background: #5a6268;
+}
+
+.rule {
+    margin-bottom: 15px;
+    padding: 15px;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    background: #f8f9fa;
+}
+
+.rule-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: nowrap;
+}
+
+.resource-search {
+    flex: 1;
+    min-width: 10px;
+    max-width: 20px;
+}
+
+.resource-select {
+    flex: 2;
+    min-width: 10px;
+    max-width: 20px;
+}
+
+.verb-checkboxes {
+    flex: 4;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 6px 12px;
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    overflow-x: auto;
+    min-width: 0;
+}
+
+.verb-checkboxes label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    margin: 0;
+    font-weight: normal;
+}
+
+.verb-checkboxes input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+}
+
+#yaml-output {
+    margin-top: 30px;
+    padding: 20px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+}
+
+#yaml-content {
+    background: #fff;
+    padding: 20px;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #24292e;
+}
+
+@media (max-width: 768px) {
+    .rule-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .resource-search,
+    .resource-select {
+        min-width: 100%;
+    }
+
+    .verb-checkboxes {
+        padding: 8px;
+        overflow-x: auto;
+        white-space: nowrap;
+        max-width: 500px;
+        display: flex;
+        gap: 8px;
+    }
+
+    .verb-checkboxes label {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+    }
+
+    .container {
+        padding: 15px;
+    }
+}

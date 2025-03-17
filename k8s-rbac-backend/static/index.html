@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kubernetes RBAC 授权管理</title>
+    <link rel="stylesheet" href="/assets/style.css">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body>
+    <div id="app" class="container">
+        <nav class="nav-menu">
+            <a href="/" class="nav-item active">创建 ServiceAccount</a>
+            <a href="/list-sa.html" class="nav-item">ServiceAccount 列表</a>
+        </nav>
+        <h1>Kubernetes RBAC 授权管理</h1>
+        <form @submit.prevent="submitForm" @keydown.enter.prevent>
+            <div>
+                <label for="serviceAccountName">ServiceAccount 名称:</label>
+                <input type="text" id="serviceAccountName" v-model="serviceAccountName" required>
+            </div>
+            <div>
+                <label for="namespace">命名空间:</label>
+                <input type="text" id="namespace" v-model="namespace" required>
+            </div>
+            <div>
+                <label>Role 规则:</label>
+                <div id="roleRules">
+                    <div v-for="(rule, index) in roleRules" :key="'role-' + index" class="rule">
+                        <div class="rule-row">
+                            <input type="text" class="resource-search" placeholder="搜索资源类型" v-model="rule.searchText" @input="filterResources(rule)">
+                            <select v-model="rule.selectedResource" @change="updateYAML" class="resource-select">
+                                <option value="">选择资源类型</option>
+                                <option v-for="resource in filteredNamespacedResources(rule)" :key="resource.name" :value="resource.apiGroup + '|' + resource.name">
+                                    {{ resource.name }} ({{ resource.kind }}, Namespaced)
+                                </option>
+                            </select>
+                            <div class="verb-checkboxes">
+                                <label v-for="verb in verbs" :key="verb">
+                                    <input type="checkbox" :value="verb" v-model="rule.selectedVerbs" @change="updateYAML"> {{ verb }}
+                                </label>
+                            </div>
+                            <button type="button" @click="removeRoleRule(index)" class="btn-icon">-</button>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" @click="addRoleRule" class="btn-icon">+</button>
+            </div>
+            <div>
+                <label>ClusterRole 规则:</label>
+                <div id="clusterRoleRules">
+                    <div v-for="(rule, index) in clusterRoleRules" :key="'cluster-' + index" class="rule">
+                        <div class="rule-row">
+                            <input type="text" class="resource-search" placeholder="搜索资源类型" v-model="rule.searchText" @input="filterResources(rule)">
+                            <select v-model="rule.selectedResource" @change="updateYAML" class="resource-select">
+                                <option value="">选择资源类型</option>
+                                <option v-for="resource in filteredResources(rule)" :key="resource.name" :value="resource.apiGroup + '|' + resource.name">
+                                    {{ resource.name }} ({{ resource.kind }}, {{ resource.namespaced ? 'Namespaced' : 'Cluster' }})
+                                </option>
+                            </select>
+                            <div class="verb-checkboxes">
+                                <label v-for="verb in verbs" :key="verb">
+                                    <input type="checkbox" :value="verb" v-model="rule.selectedVerbs" @change="updateYAML"> {{ verb }}
+                                </label>
+                            </div>
+                            <button type="button" @click="removeClusterRoleRule(index)" class="btn-icon">-</button>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" @click="addClusterRoleRule" class="btn-icon">+</button>
+            </div>
+            <button type="submit">创建 ServiceAccount 和 RBAC 资源</button>
+        </form>
+
+        <!-- 展示生成的 YAML -->
+        <div id="yaml-output">
+            <h2>生成的 YAML 文件</h2>
+            <pre>{{ yamlContent }}</pre>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    serviceAccountName: '',
+                    namespace: '',
+                    resources: [],
+                    verbs: [],
+                    roleRules: [],
+                    clusterRoleRules: [],
+                    yamlContent: ''
+                }
+            },
+            methods: {
+                async fetchResources() {
+                    try {
+                        const response = await fetch('/resources');
+                        if (!response.ok) throw new Error('获取资源类型失败');
+                        this.resources = await response.json();
+                    } catch (error) {
+                        console.error('获取资源类型失败:', error);
+                        alert('获取资源类型失败，请检查后端服务是否正常运行。');
+                    }
+                },
+                async fetchVerbs() {
+                    try {
+                        const response = await fetch('/verbs');
+                        if (!response.ok) throw new Error('获取操作动词失败');
+                        this.verbs = await response.json();
+                    } catch (error) {
+                        console.error('获取操作动词失败:', error);
+                        alert('获取操作动词失败，请检查后端服务是否正常运行。');
+                    }
+                },
+                addRoleRule() {
+                    this.roleRules.push({
+                        searchText: '',
+                        selectedResource: '',
+                        selectedVerbs: [],
+                        filteredResources: []
+                    });
+                },
+                addClusterRoleRule() {
+                    this.clusterRoleRules.push({
+                        searchText: '',
+                        selectedResource: '',
+                        selectedVerbs: [],
+                        filteredResources: []
+                    });
+                },
+                removeRoleRule(index) {
+                    this.roleRules.splice(index, 1);
+                    this.updateYAML();
+                },
+                removeClusterRoleRule(index) {
+                    this.clusterRoleRules.splice(index, 1);
+                    this.updateYAML();
+                },
+                filterResources(rule) {
+                    const searchText = rule.searchText.toLowerCase();
+                    const filteredResources = this.resources.filter(resource => 
+                        resource.name.toLowerCase().includes(searchText) ||
+                        resource.kind.toLowerCase().includes(searchText)
+                    );
+                    rule.filteredResources = filteredResources;
+                    if (filteredResources.length > 0) {
+                        const firstMatch = filteredResources[0];
+                        rule.selectedResource = firstMatch.apiGroup + '|' + firstMatch.name;
+                        this.updateYAML();
+                    }
+                },
+                filteredNamespacedResources(rule) {
+                    const searchText = rule.searchText.toLowerCase();
+                    return this.resources.filter(resource => 
+                        resource.namespaced && (
+                            resource.name.toLowerCase().includes(searchText) ||
+                            resource.kind.toLowerCase().includes(searchText)
+                        )
+                    );
+                },
+                filteredResources(rule) {
+                    const searchText = rule.searchText.toLowerCase();
+                    return this.resources.filter(resource => 
+                        resource.name.toLowerCase().includes(searchText) ||
+                        resource.kind.toLowerCase().includes(searchText)
+                    );
+                },
+                updateYAML() {
+                    if (!this.serviceAccountName || !this.namespace) {
+                        this.yamlContent = '请填写 ServiceAccount 名称和命名空间';
+                        return;
+                    }
+
+                    const roleRulesData = this.roleRules
+                        .filter(rule => rule.selectedResource && rule.selectedVerbs.length > 0)
+                        .map(rule => {
+                            const [apiGroup, resource] = rule.selectedResource.split('|');
+                            return {
+                                apiGroups: [apiGroup],
+                                resources: [resource],
+                                verbs: rule.selectedVerbs
+                            };
+                        });
+
+                    const clusterRoleRulesData = this.clusterRoleRules
+                        .filter(rule => rule.selectedResource && rule.selectedVerbs.length > 0)
+                        .map(rule => {
+                            const [apiGroup, resource] = rule.selectedResource.split('|');
+                            return {
+                                apiGroups: [apiGroup],
+                                resources: [resource],
+                                verbs: rule.selectedVerbs
+                            };
+                        });
+
+                    this.yamlContent = this.generateYAML(roleRulesData, clusterRoleRulesData);
+                },
+                generateYAML(roleRules, clusterRoleRules) {
+                    const yaml = `apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ${this.serviceAccountName}
+---
+${roleRules.map(rule => `apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ${this.serviceAccountName}-role
+  namespace: ${this.namespace}
+rules:
+  - apiGroups: ${JSON.stringify(rule.apiGroups)}
+    resources: ${JSON.stringify(rule.resources)}
+    verbs: ${JSON.stringify(rule.verbs)}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ${this.serviceAccountName}-role-binding
+  namespace: ${this.namespace}
+subjects:
+- kind: ServiceAccount
+  name: ${this.serviceAccountName}
+roleRef:
+  kind: Role
+  name: ${this.serviceAccountName}-role
+  apiGroup: rbac.authorization.k8s.io`).join('\n---\n')}${clusterRoleRules.length > 0 ? '\n---\n' : ''}${clusterRoleRules.map(rule => `apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ${this.serviceAccountName}-cluster-role
+rules:
+  - apiGroups: ${JSON.stringify(rule.apiGroups)}
+    resources: ${JSON.stringify(rule.resources)}
+    verbs: ${JSON.stringify(rule.verbs)}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ${this.serviceAccountName}-cluster-role-binding
+subjects:
+- kind: ServiceAccount
+  name: ${this.serviceAccountName}
+roleRef:
+  kind: ClusterRole
+  name: ${this.serviceAccountName}-cluster-role
+  apiGroup: rbac.authorization.k8s.io`).join('\n---\n')}`;
+
+                    return yaml.trim();
+                },
+                async submitForm() {
+                    const roleRulesData = this.roleRules
+                        .filter(rule => rule.selectedResource && rule.selectedVerbs.length > 0)
+                        .map(rule => {
+                            const [apiGroup, resource] = rule.selectedResource.split('|');
+                            return {
+                                apiGroups: [apiGroup],
+                                resources: [resource],
+                                verbs: rule.selectedVerbs
+                            };
+                        });
+
+                    const clusterRoleRulesData = this.clusterRoleRules
+                        .filter(rule => rule.selectedResource && rule.selectedVerbs.length > 0)
+                        .map(rule => {
+                            const [apiGroup, resource] = rule.selectedResource.split('|');
+                            return {
+                                apiGroups: [apiGroup],
+                                resources: [resource],
+                                verbs: rule.selectedVerbs
+                            };
+                        });
+
+                    const requestData = {
+                        serviceAccountName: this.serviceAccountName,
+                        namespace: this.namespace,
+                        roleRules: roleRulesData,
+                        clusterRoleRules: clusterRoleRulesData
+                    };
+                    
+                    try {
+                        const response = await fetch('/create-sa', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(requestData)
+                        });
+                        
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || '创建资源失败');
+                        }
+                        
+                        const result = await response.text();
+                        alert(result);
+                    } catch (error) {
+                        console.error('创建资源失败:', error);
+                        alert(error.message || '创建资源失败，请检查后端服务是否正常运行。');
+                    }
+                }
+            },
+            mounted() {
+                this.fetchResources();
+                this.fetchVerbs();
+            },
+            watch: {
+                serviceAccountName() { this.updateYAML(); },
+                namespace() { this.updateYAML(); }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
