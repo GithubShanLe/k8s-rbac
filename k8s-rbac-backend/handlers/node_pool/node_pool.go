@@ -8,7 +8,9 @@ import (
 	"k8s-rbac-backend/k8s"
 	"net/http"
 	"strings"
+	"sync"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -65,7 +67,6 @@ func ListNodePool(w http.ResponseWriter, r *http.Request) {
 	if req.NodePoolName != "" {
 		labelSelector = fmt.Sprintf("nodepool=%s", req.NodePoolName)
 	}
-
 	nodes, err := clientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
@@ -76,59 +77,75 @@ func ListNodePool(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 按标签分组节点
+	var (
+		limit = make(chan struct{}, 10)
+		lock  = new(sync.RWMutex)
+		wait  = new(sync.WaitGroup)
+	)
+
 	nodePoolMap := make(map[string]*NodePool)
+
 	for _, node := range nodes.Items {
-		pod, err := clientset.CoreV1().Pods("").List(context.Background(), metav1.ListOptions{
-			FieldSelector: fmt.Sprintf("spec.nodeName=%s", node.Name),
-		})
-		if err != nil {
-			resp.ErrorCode = "500"
-			resp.ErrorMessage = fmt.Sprintf("获取节点Pod失败: %v", err)
-			return
-		}
-		// 创建节点信息
-		nodeInfo := Node{
-			Name:       node.Name,
-			Status:     GetNodeStatus(node),
-			RequestCpu: node.Status.Allocatable.Cpu().MilliValue(),
-			LimitCpu:   node.Status.Capacity.Cpu().MilliValue(),
-			RequestMem: node.Status.Allocatable.Memory().MilliValue() / (1024 * 1024), // 转换为 MB
-			LimitMem:   node.Status.Capacity.Memory().MilliValue() / (1024 * 1024),
-			CurrentPod: int64(len(pod.Items)),
-			RequestPod: node.Status.Allocatable.Pods().Value(),
-			LimitPod:   node.Status.Capacity.Pods().Value(),
-			NodeIp:     node.Status.Addresses[0].Address,
-			CreatedAt:  node.CreationTimestamp.Format("2006-01-02 15:04:05"),
-		}
-
-		// 获取节点标签
-		labels := node.Labels
-		nodePoolKey := "default"
-		fmt.Println(labels)
-		for l, v := range labels {
-			if strings.Contains(l, "nodepool") || strings.Contains(l, "nodegroup") {
-				nodePoolKey = v
+		limit <- struct{}{}
+		wait.Add(1)
+		go func(node corev1.Node) {
+			defer func() {
+				<-limit
+				wait.Done()
+			}()
+			pod, err := clientset.CoreV1().Pods("").List(context.Background(), metav1.ListOptions{
+				FieldSelector: fmt.Sprintf("spec.nodeName=%s", node.Name),
+			})
+			if err != nil {
+				resp.ErrorCode = "500"
+				resp.ErrorMessage = fmt.Sprintf("获取节点Pod失败: %v", err)
+				return
 			}
-		}
-
-		// 如果节点池不存在，创建新的节点池
-		if _, exists := nodePoolMap[nodePoolKey]; !exists {
-			nodePoolMap[nodePoolKey] = &NodePool{
-				Status:   "Active",
-				Lables:   labels,
-				Taints:   make(map[string]string),
-				NodeList: make([]Node, 0),
-				Name:     nodePoolKey,
+			// 创建节点信息
+			nodeInfo := Node{
+				Name:       node.Name,
+				Status:     GetNodeStatus(node),
+				RequestCpu: node.Status.Allocatable.Cpu().MilliValue(),
+				LimitCpu:   node.Status.Capacity.Cpu().MilliValue(),
+				RequestMem: node.Status.Allocatable.Memory().MilliValue() / (1024 * 1024), // 转换为 MB
+				LimitMem:   node.Status.Capacity.Memory().MilliValue() / (1024 * 1024),
+				CurrentPod: int64(len(pod.Items)),
+				RequestPod: node.Status.Allocatable.Pods().Value(),
+				LimitPod:   node.Status.Capacity.Pods().Value(),
+				NodeIp:     node.Status.Addresses[0].Address,
+				CreatedAt:  node.CreationTimestamp.Format("2006-01-02 15:04:05"),
 			}
-			// 添加污点信息
-			for _, taint := range node.Spec.Taints {
-				nodePoolMap[nodePoolKey].Taints[taint.Key] = string(taint.Effect)
-			}
-		}
 
-		// 将节点添加到对应的节点池
-		nodePoolMap[nodePoolKey].NodeList = append(nodePoolMap[nodePoolKey].NodeList, nodeInfo)
+			// 获取节点标签
+			labels := node.Labels
+			nodePoolKey := "default"
+			for l, v := range labels {
+				if strings.Contains(l, "nodepool") || strings.Contains(l, "nodegroup") {
+					nodePoolKey = v
+				}
+			}
+			lock.Lock()
+			defer lock.Unlock()
+			// 如果节点池不存在，创建新的节点池
+			if _, exists := nodePoolMap[nodePoolKey]; !exists {
+				nodePoolMap[nodePoolKey] = &NodePool{
+					Status:   "Active",
+					Lables:   labels,
+					Taints:   make(map[string]string),
+					NodeList: make([]Node, 0),
+					Name:     nodePoolKey,
+				}
+				// 添加污点信息
+				for _, taint := range node.Spec.Taints {
+					nodePoolMap[nodePoolKey].Taints[taint.Key] = string(taint.Effect)
+				}
+			}
+
+			// 将节点添加到对应的节点池
+			nodePoolMap[nodePoolKey].NodeList = append(nodePoolMap[nodePoolKey].NodeList, nodeInfo)
+		}(node)
 	}
+	wait.Wait()
 
 	// 转换 map 为数组
 	for _, pool := range nodePoolMap {
