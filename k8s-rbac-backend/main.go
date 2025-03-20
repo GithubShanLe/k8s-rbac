@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"k8s-rbac-backend/handlers"
+	nodepool "k8s-rbac-backend/handlers/node_pool"
 	"k8s-rbac-backend/handlers/sa"
 )
 
@@ -46,6 +47,8 @@ func main() {
 			handlers.GetNamespaces(w, r)
 		case "/api/update-sa":
 			sa.UpdateSa(w, r)
+		case "/api/nodepool/list":
+			nodepool.ListNodePool(w, r)
 		default:
 			http.NotFound(w, r)
 		}

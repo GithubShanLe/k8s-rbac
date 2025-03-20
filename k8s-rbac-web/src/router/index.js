@@ -56,66 +56,31 @@ export const constantRoutes = [
   },
 
   {
-    path: '/example',
+    path: '/kubernetes',
     component: Layout,
-    redirect: '/example/table',
-    name: 'Example',
-    meta: { title: 'Example', icon: 'el-icon-s-help' },
-    children: [
-      {
-        path: 'table',
-        name: 'Table',
-        component: () => import('@/views/table/index'),
-        meta: { title: 'Table', icon: 'table' }
-      },
-      {
-        path: 'tree',
-        name: 'Tree',
-        component: () => import('@/views/tree/index'),
-        meta: { title: 'Tree', icon: 'tree' }
-      }
-    ]
-  },
-
-  {
-    path: '/form',
-    component: Layout,
-    children: [
-      {
-        path: 'index',
-        name: 'Form',
-        component: () => import('@/views/form/index'),
-        meta: { title: 'Form', icon: 'form' }
-      }
-    ]
-  },
-
-  {
-    path: '/nested',
-    component: Layout,
-    redirect: '/nested/menu1',
-    name: 'Nested',
+    name: 'kubernetes',
     meta: {
-      title: 'Nested',
-      icon: 'nested'
+      title: 'kubernetes',
+      icon: 'k8s'
     },
     children: [
       {
         path: 'rbac',
         component: () => import('@/views/k8s/rbac/index'),
-        name: 'Rbac',
-        meta: { title: 'Rbac'}
-      }
-    ]
-  },
-
-  {
-    path: 'external-link',
-    component: Layout,
-    children: [
+        name: 'rbac',
+        meta: { title: 'rbac'}
+      },
       {
-        path: 'https://panjiachen.github.io/vue-element-admin-site/#/',
-        meta: { title: 'External Link', icon: 'link' }
+        path: 'nodepool',
+        component: () => import('@/views/k8s/nodepool/index'),
+        name: 'nodepool',
+        meta: { title: 'nodepool'}
+      },
+      // 在k8s相关路由配置中添加
+      {
+        path: '/k8s/nodepool/detail',
+        component: () => import('@/views/k8s/nodepool/detail'),
+        name: 'NodePoolDetail',
       }
     ]
   },

@@ -21,7 +21,7 @@ func init() {
 	} else {
 		panic("无法找到 kubeconfig 文件")
 	}
-	kubeconfig = "/Users/shanyue/kubecm_config/test"
+	kubeconfig = "/Users/shanyue/kubecm_config/ops-prod-alisg"
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
 		panic(fmt.Sprintf("无法加载 kubeconfig: %v", err))

@@ -114,3 +114,12 @@ export function deleteSa(namespace, name) {
     }
   });
 }
+
+
+export function listNodePool(data) {
+  return request({
+    url: '/nodepool/list',
+    method: 'post',
+    data:data
+  })
+}
