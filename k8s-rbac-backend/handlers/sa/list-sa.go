@@ -159,8 +159,8 @@ func GetServiceAccountDetails(w http.ResponseWriter, r *http.Request) {
 		resp.ErrorMessage = fmt.Sprintf("ServiceAccountName 不能为空")
 		return
 	}
-	if req.Namespace == "" {
-		req.Namespace = "default"
+	if req.Namespace == "all+" {
+		req.Namespace = ""
 	}
 	// 获取 Kubernetes 客户端
 	clientset := k8s.GetClient()

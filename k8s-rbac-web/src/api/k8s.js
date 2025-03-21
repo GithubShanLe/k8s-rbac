@@ -123,3 +123,83 @@ export function listNodePool(data) {
     data:data
   })
 }
+
+export function listNodes(data) {
+  return request({
+    url: '/node/list',
+    method: 'post',
+    data:data
+  })
+}
+
+export function listService(data) {
+  return request({
+    url: '/svc/list',
+    method: 'post',
+    data:data
+  })
+}
+export function listDeployment(data) {
+  return request({
+    url: '/workload/deployment/list',
+    method: 'post',
+    data:data
+  })
+}
+
+export function listReplicaset(data) {
+  return request({
+    url: '/workload/replicaset/list',
+    method: 'post',
+    data:data
+  })
+}
+
+export function listStatefulset(data) {
+  return request({
+    url: '/workload/statefulset/list',
+    method: 'post',
+    data:data
+  })
+}
+
+export function listPod(data) {
+  return request({
+    url: '/workload/pod/list',
+    method: 'post',
+    data:data
+  })
+}
+
+export function listJob(data) {
+  return request({
+    url: '/workload/job/list',
+    method: 'post',
+    data:data
+  })
+}
+
+export function listCronJob(data) {
+  return request({
+    url: '/workload/cronjob/list',
+    method: 'post',
+    data:data
+  })
+}
+
+
+export function listDaemonset(data) {
+  return request({
+    url: '/workload/daemonset/list',
+    method: 'post',
+    data:data
+  })
+}
+
+export function getPodMetrics(data) {
+  return request({
+    url: '/workload/pod/metrics',
+    method: 'post',
+    data:data
+  })
+}

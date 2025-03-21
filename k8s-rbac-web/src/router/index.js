@@ -81,6 +81,60 @@ export const constantRoutes = [
         path: '/k8s/nodepool/detail',
         component: () => import('@/views/k8s/nodepool/detail'),
         name: 'NodePoolDetail',
+      },
+      {
+        path: 'node',
+        component: () => import('@/views/k8s/node/index'),
+        name: 'node',
+        meta: { title: 'node'}
+      },
+      {
+        path: 'service',
+        component: () => import('@/views/k8s/service/index'),
+        name: 'service',
+        meta: { title: 'service'}
+      },
+      {
+        path: 'deployment',
+        component: () => import('@/views/k8s/deployment/index'),
+        name: 'deployment',
+        meta: { title: 'deployment'}
+      },
+      {
+        path: 'replicaset',
+        component: () => import('@/views/k8s/replicaset/index'),
+        name: 'replicaset',
+        meta: { title: 'replicaset'}
+      },
+      {
+        path: 'statefulset',
+        component: () => import('@/views/k8s/statefulset/index'),
+        name: 'statefulset',
+        meta: { title: 'statefulset'}
+      },
+      {
+        path: 'pod',
+        component: () => import('@/views/k8s/pod/index'),
+        name: 'pod',
+        meta: { title: 'pod'}
+      },
+      {
+        path: 'job',
+        component: () => import('@/views/k8s/job/index'),
+        name: 'job',
+        meta: { title: 'job'}
+      },
+      {
+        path: 'cronjob',
+        component: () => import('@/views/k8s/cronjob/index'),
+        name: 'cronjob',
+        meta: { title: 'cronjob'}
+      },
+      {
+        path: 'daemonset',
+        component: () => import('@/views/k8s/daemonset/index'),
+        name: 'daemonset',
+        meta: { title: 'daemonset'}
       }
     ]
   },

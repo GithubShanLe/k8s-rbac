@@ -28,6 +28,8 @@ func GetNamespaces(w http.ResponseWriter, r *http.Request) {
 	for _, item := range namespaces.Items {
 		resp.Namespaces = append(resp.Namespaces, item.Name)
 	}
+	//用于前段显示，表示所有命名空间
+	resp.Namespaces = append(resp.Namespaces, "all+")
 	// 返回 JSON 响应
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

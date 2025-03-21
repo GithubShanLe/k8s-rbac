@@ -24,24 +24,25 @@ type ListNodePoolResponse struct {
 }
 type NodePool struct {
 	Name     string            `json:"name"`
-	Status   string            `json:"status"` //暂时不使用
-	Lables   map[string]string `json:"lables"`
-	Taints   map[string]string `json:"taints"`
+	Status   string            `json:"status"` //暂时不使用，开始管理nodepool时才会用到
+	Lables   map[string]string `json:"lables"` //暂时不使用,开始管理nodepool时才会用到
+	Taints   map[string]string `json:"taints"` //暂时不使用，开始管理nodepool时才会用到
 	NodeList []Node            `json:"nodeList"`
 }
 
 type Node struct {
-	Name       string `json:"name"`
-	Status     string `json:"status"`
-	RequestCpu int64  `json:"requestCpu"`
-	LimitCpu   int64  `json:"limitCpu"`
-	RequestMem int64  `json:"requestMem"`
-	LimitMem   int64  `json:"limitMem"`
-	CurrentPod int64  `json:"currentPod"`
-	RequestPod int64  `json:"requestPod"`
-	LimitPod   int64  `json:"limitPod"`
-	NodeIp     string `json:"nodeIp"`
-	CreatedAt  string `json:"createdAt"`
+	Name       string            `json:"name"`
+	Status     string            `json:"status"`
+	RequestCpu int64             `json:"requestCpu"`
+	LimitCpu   int64             `json:"limitCpu"`
+	RequestMem int64             `json:"requestMem"`
+	LimitMem   int64             `json:"limitMem"`
+	RequestPod int64             `json:"requestPod"`
+	LimitPod   int64             `json:"limitPod"`
+	NodeIp     string            `json:"nodeIp"`
+	CreatedAt  string            `json:"createdAt"`
+	Lables     map[string]string `json:"lables"`
+	Taints     map[string]string `json:"taints"`
 }
 
 // 获取节点池和节点列表
@@ -93,28 +94,17 @@ func ListNodePool(w http.ResponseWriter, r *http.Request) {
 				<-limit
 				wait.Done()
 			}()
-			pod, err := clientset.CoreV1().Pods("").List(context.Background(), metav1.ListOptions{
-				FieldSelector: fmt.Sprintf("spec.nodeName=%s", node.Name),
-			})
-			if err != nil {
-				resp.ErrorCode = "500"
-				resp.ErrorMessage = fmt.Sprintf("获取节点Pod失败: %v", err)
-				return
-			}
+			//拖慢了listNodePool的响应速度,不在使用，暂时不考虑使用缓存
+			// pod, err := clientset.CoreV1().Pods("").List(context.Background(), metav1.ListOptions{
+			// 	FieldSelector: fmt.Sprintf("spec.nodeName=%s", node.Name),
+			// })
+			// if err != nil {
+			// 	resp.ErrorCode = "500"
+			// 	resp.ErrorMessage = fmt.Sprintf("获取节点Pod失败: %v", err)
+			// 	return
+			// }
 			// 创建节点信息
-			nodeInfo := Node{
-				Name:       node.Name,
-				Status:     GetNodeStatus(node),
-				RequestCpu: node.Status.Allocatable.Cpu().MilliValue(),
-				LimitCpu:   node.Status.Capacity.Cpu().MilliValue(),
-				RequestMem: node.Status.Allocatable.Memory().MilliValue() / (1024 * 1024), // 转换为 MB
-				LimitMem:   node.Status.Capacity.Memory().MilliValue() / (1024 * 1024),
-				CurrentPod: int64(len(pod.Items)),
-				RequestPod: node.Status.Allocatable.Pods().Value(),
-				LimitPod:   node.Status.Capacity.Pods().Value(),
-				NodeIp:     node.Status.Addresses[0].Address,
-				CreatedAt:  node.CreationTimestamp.Format("2006-01-02 15:04:05"),
-			}
+			nodeInfo := getNodes(node)
 
 			// 获取节点标签
 			labels := node.Labels
@@ -129,16 +119,16 @@ func ListNodePool(w http.ResponseWriter, r *http.Request) {
 			// 如果节点池不存在，创建新的节点池
 			if _, exists := nodePoolMap[nodePoolKey]; !exists {
 				nodePoolMap[nodePoolKey] = &NodePool{
-					Status:   "Active",
-					Lables:   labels,
-					Taints:   make(map[string]string),
-					NodeList: make([]Node, 0),
-					Name:     nodePoolKey,
+					Status: "Active",
+					// Lables: labels,
+					// Taints:   make(map[string]string),
+					// NodeList: make([]Node, 0),
+					Name: nodePoolKey,
 				}
-				// 添加污点信息
-				for _, taint := range node.Spec.Taints {
-					nodePoolMap[nodePoolKey].Taints[taint.Key] = string(taint.Effect)
-				}
+				// // 添加污点信息
+				// for _, taint := range node.Spec.Taints {
+				// 	nodePoolMap[nodePoolKey].Taints[taint.Key] = string(taint.Effect)
+				// }
 			}
 
 			// 将节点添加到对应的节点池
@@ -152,4 +142,33 @@ func ListNodePool(w http.ResponseWriter, r *http.Request) {
 		resp.NodePools = append(resp.NodePools, *pool)
 	}
 	return
+}
+
+func getNodes(node corev1.Node) Node {
+	// 按标签分组节点
+	return Node{
+		Name:       node.Name,
+		Status:     GetNodeStatus(node),
+		RequestCpu: node.Status.Allocatable.Cpu().MilliValue(),
+		LimitCpu:   node.Status.Capacity.Cpu().MilliValue(),
+		RequestMem: node.Status.Allocatable.Memory().MilliValue() / (1024 * 1024), // 转换为 MB
+		LimitMem:   node.Status.Capacity.Memory().MilliValue() / (1024 * 1024),
+		RequestPod: node.Status.Allocatable.Pods().Value(),
+		LimitPod:   node.Status.Capacity.Pods().Value(),
+		NodeIp: func() string {
+			if len(node.Status.Addresses) > 0 {
+				return node.Status.Addresses[0].Address
+			}
+			return "N/A"
+		}(),
+		CreatedAt: node.CreationTimestamp.Format("2006-01-02 15:04:05"),
+		Lables:    node.Labels,
+		Taints: func() map[string]string {
+			taints := make(map[string]string)
+			for _, taint := range node.Spec.Taints {
+				taints[taint.Key] = string(taint.Effect)
+			}
+			return taints
+		}(),
+	}
 }

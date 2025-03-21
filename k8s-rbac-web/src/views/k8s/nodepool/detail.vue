@@ -130,7 +130,7 @@
           style="width: 100%">
           <el-table-column prop="name" label="节点名称" min-width="50" show-overflow-tooltip />
           <el-table-column prop="nodeIp" label="IP" width="140" />
-          <el-table-column label="CPU" width="200">
+          <el-table-column label="CPU(R/L)" width="200">
             <template slot-scope="scope">
               <el-progress 
                 :percentage="calculateCpuUsage(scope.row)" 
@@ -139,7 +139,7 @@
               ></el-progress>
             </template>
           </el-table-column>
-          <el-table-column label="内存" width="200">
+          <el-table-column label="内存(R/L)" width="200">
             <template slot-scope="scope">
               <el-progress 
                 :percentage="calculateMemUsage(scope.row)" 
@@ -148,9 +148,9 @@
               ></el-progress>
             </template>
           </el-table-column>
-          <el-table-column label="Pod" width="140">
+          <el-table-column label="Pod(R/L)" width="140">
             <template slot-scope="scope">
-              {{ scope.row.currentPod || 0 }}/{{ scope.row.limitPod || 0 }}
+              {{ scope.row.requestPod || 0 }}/{{ scope.row.limitPod || 0 }}
             </template>
           </el-table-column>
           <el-table-column prop="status" label="状态" width="120">

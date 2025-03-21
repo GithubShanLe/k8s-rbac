@@ -1,0 +1,323 @@
+<template>
+
+  <el-card class="box-card">
+    <div class="filter-container">
+      <el-select v-model="queryParams.nameSpace" placeholder="命名空间" filterable class="filter-item"  @change="handleNamespaceChange">
+        <el-option
+          v-for="ns in namespaces"
+          :key="ns"
+          :label="ns"
+          :value="ns"
+        />
+      </el-select>
+      <el-input
+        v-model="queryParams.serviceName"
+        placeholder="svc名称"
+        class="filter-item"
+        style="width: 200px;"
+        clearable
+        @keyup.enter.native="fetchData"
+      />
+      <el-button class="filter-item" type="primary" @click="fetchData">
+        查询
+      </el-button>
+    </div>
+        <!-- 节点列表 -->
+    <el-card shadow="hover" class="mt-20 info-card">
+      <div slot="header" class="sub-header">
+        <i class="el-icon-cpu"></i> svc列表
+        <span class="sub-title-count">({{ svc.length || 0 }})</span>
+      </div>
+      <el-table 
+        :data="svc" 
+        border 
+        stripe
+        style="width: 100%">
+        <el-table-column prop="name" label="名称" min-width="50" show-overflow-tooltip />
+        <el-table-column prop="namespace" label="命名空间" width="180" />  
+          <el-table-column label="标签" width="250">
+            <template slot-scope="{ row, $index }">
+              <div class="tag-container">
+                <template v-if="Object.keys(row.labels || {}).length > 0">
+                  <!-- 始终显示前三个标签 -->
+                  <div 
+                    v-for="(value, key, index) in row.labels"
+                    :key="key"
+                    v-if="index < 3 || row.labelsExpanded"
+                    class="tag-item-wrapper"
+                  >
+                    <el-tag
+                      type="primary"
+                      size="mini"
+                      class="tag-item"
+                    >
+                      {{ key }}: {{ value }}
+                    </el-tag>
+                  </div>
+                </template>
+                <span v-else class="muted-text">无标签</span>
+              </div>
+              <div v-if="Object.keys(row.labels || {}).length > 3" class="fold-hint">
+                <el-button type="text" size="mini" @click="toggleLabels($index)">
+                  {{ row.labelsExpanded ? '收起' : `展开(${Object.keys(row.labels).length - 3}个)` }}
+                  <i :class="row.labelsExpanded ? 'el-icon-arrow-up' : 'el-icon-arrow-down'"></i>
+                </el-button>
+              </div>
+            </template>
+          </el-table-column>
+        <el-table-column prop="type" label="类型" width="100" />
+        <el-table-column prop="clusterIp" label="集群IP" width="120" show-overflow-tooltip />
+        <el-table-column prop="internalEndpoints" label="内部endpoint" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="externalEndpoints" label="外部endpoint" width="150"/>
+        <el-table-column prop="createTime" label="创建时间" width="150" />
+      </el-table>
+    </el-card>
+  </el-card>
+</template>
+
+<script>
+
+import { listService, getNamespaces } from '@/api/k8s'
+export default {
+  data() {
+    return {
+      listLoading: false,
+      svc: [],
+      labels: {},
+      labelsFolded: true,
+      namespaces: [], // 添加命名空间列表
+      queryParams: {
+        nameSpace: localStorage.getItem('lastNamespace') || 'kube-system',
+        serviceName: ''
+      }
+    }
+  },
+
+  async mounted() {
+    await this.getNamespaces()
+    await this.fetchData()
+  },
+
+  methods: {
+    handleNamespaceChange() {
+      this.fetchData()
+    },
+async getNamespaces() {
+  try {
+    const res = await getNamespaces()
+    console.log('原始返回数据:', res) // 查看完整返回数据
+    
+    if (!res) {
+      console.warn('接口返回为空')
+      this.namespaces = ['kube-system']
+      return
+    }
+
+    if (res.items && Array.isArray(res.items)) {
+      this.namespaces = res.items.map(item => item.metadata.name)
+    } else if (Array.isArray(res)) {
+      this.namespaces = res
+    } else if (res.namespaces && Array.isArray(res.namespaces)) {
+      this.namespaces = res.namespaces
+    } else {
+      console.warn('无法解析的数据格式:', res)
+      this.namespaces = ['default']
+    }
+    
+    console.log('处理后的命名空间列表:', this.namespaces)
+  } catch (error) {
+    console.error('获取命名空间列表失败:', error)
+    this.namespaces = ['default']
+  }
+},
+
+    async fetchData() {
+      this.listLoading = true
+      try {
+        localStorage.setItem('lastNamespace', this.queryParams.nameSpace)
+        
+        const { data } = await listService({
+          nameSpace: this.queryParams.nameSpace,
+          serviceName: this.queryParams.serviceName
+        })
+        if (data.errorCode) {
+          this.$message.error(data.errorMessage || '获取数据失败')
+          return
+        }
+        
+        this.svc = (data.services || []).map(service => ({
+          ...service,
+          labelsExpanded: false
+        }))
+      } catch (error) {
+        this.$message.error('请求异常：' + error.message)
+      } finally {
+        this.listLoading = false
+      }
+    }
+  }
+}
+</script>
+
+<style scoped>
+.box-card {
+margin: 20px;
+}
+.fr {
+float: right;
+}
+.mt-20 {
+margin-top: 20px;
+}
+.info-card {
+margin-bottom: 0;
+}
+.sub-header {
+font-size: 16px;
+font-weight: bold;
+color: #303133;
+display: flex;
+align-items: center;
+}
+.sub-header i {
+margin-right: 8px;
+font-size: 18px;
+}
+.sub-title-count {
+margin-left: 8px;
+font-size: 14px;
+color: #909399;
+font-weight: normal;
+}
+.info-item {
+display: flex;
+margin-bottom: 15px;
+align-items: center;
+}
+.info-item .label {
+font-weight: bold;
+width: 100px;
+color: #606266;
+}
+.info-item .value {
+flex: 1;
+color: #303133;
+}
+.label-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.tag-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-height: 300px;
+  overflow: auto;
+  transition: max-height 0.3s;
+}
+
+.tag-container.is-folded {
+  max-height: 40px;
+  overflow: hidden;
+}
+
+.tag-item {
+margin: 2px;
+}
+.muted-text {
+color: #909399;
+font-style: italic;
+}
+.fold-button {
+margin-left: auto;
+font-size: 13px;
+}
+
+.tag-container.is-folded {
+max-height: 40px;
+overflow: hidden;
+}
+
+.fold-hint {
+color: #909399;
+font-size: 12px;
+margin-top: 8px;
+text-align: right;
+}
+
+.info-icon {
+  font-size: 24px;
+  color: #409EFF;
+  margin-right: 15px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: rgba(64, 158, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.basic-info-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  padding: 10px 0;
+}
+
+.info-block {
+  display: flex;
+  align-items: center;
+  padding: 15px;
+  min-width: 200px;
+  flex: 1;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  margin: 0 10px;
+  transition: all 0.3s;
+}
+
+.info-block:hover {
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.info-content {
+  flex: 1;
+}
+
+.info-label {
+  font-size: 13px;
+  color: #909399;
+  margin-bottom: 5px;
+}
+
+.info-value {
+  font-size: 16px;
+  color: #303133;
+  font-weight: bold;
+}
+
+.tag-container {
+  display: flex;
+  flex-direction: column; /* 改为垂直布局 */
+  gap: 5px;
+}
+
+.tag-item-wrapper {
+  width: 100%;
+}
+
+.tag-item {
+  width: 100%; /* 标签占满容器宽度 */
+  margin: 0; /* 移除默认边距 */
+  justify-content: flex-start; /* 左对齐文本 */
+}
+</style>
+
+
+
+
