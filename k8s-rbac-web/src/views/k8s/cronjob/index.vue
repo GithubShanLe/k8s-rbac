@@ -1,6 +1,27 @@
 <template>
 
   <el-card class="box-card">
+  <div class="filter-container">
+      <el-select v-model="queryParams.nameSpace" placeholder="命名空间" class="filter-item" filterable  @change="handleNamespaceChange">
+        <el-option
+          v-for="ns in namespaces"
+          :key="ns"
+          :label="ns"
+          :value="ns"
+        />
+      </el-select>
+      <el-input
+        v-model="queryParams.cronJobName"
+        placeholder="cronJob名称"
+        class="filter-item"
+        style="width: 200px;"
+        clearable
+        @keyup.enter.native="fetchData"
+      />
+      <el-button class="filter-item" type="primary" @click="fetchData">
+        查询
+      </el-button>
+    </div>
         <!-- 节点列表 -->
     <el-card shadow="hover" class="mt-20 info-card">
       <div slot="header" class="sub-header">
@@ -53,18 +74,24 @@
 
 <script>
 
-import { listCronJob } from '@/api/k8s'
+import { listCronJob,getNamespaces } from '@/api/k8s'
 export default {
 data() {
 return {
   listLoading: false,
   cronjobs: [],
   labels: {},  // 初始化 labels 为空对象
-  labelsFolded: true  // 添加折叠状态控制
+  labelsFolded: true, // 添加折叠状态控制
+   namespaces: [], // 添加命名空间列表
+  queryParams: {
+    nameSpace: localStorage.getItem('lastNamespace') || 'default',
+    cronjobName: ''
+  }
 }
 },
 mounted() {
 this.fetchData()
+this.getNamespaces()
 },
 methods: {
 toggleLabels(index) {
@@ -75,11 +102,45 @@ toggleLabels(index) {
     this.$set(this.cronjobs[index], 'labelsExpanded', false);
   }
 },
+handleNamespaceChange() {
+      this.fetchData()
+    },
+async getNamespaces() {
+  try {
+    const res = await getNamespaces()
+    
+    if (!res) {
+      console.warn('接口返回为空')
+      this.namespaces = ['kube-system']
+      return
+    }
+
+    if (res.items && Array.isArray(res.items)) {
+      this.namespaces = res.items.map(item => item.metadata.name)
+    } else if (Array.isArray(res)) {
+      this.namespaces = res
+    } else if (res.namespaces && Array.isArray(res.namespaces)) {
+      this.namespaces = res.namespaces
+    } else {
+      console.warn('无法解析的数据格式:', res)
+      this.namespaces = ['default']
+    }
+    
+    console.log('处理后的命名空间列表:', this.namespaces)
+  } catch (error) {
+    console.error('获取命名空间列表失败:', error)
+    this.namespaces = ['default']
+  }
+},
 
 async fetchData() {
   this.listLoading = true
   try {
-    const { data } = await listCronJob({})
+    localStorage.setItem('lastNamespace', this.queryParams.nameSpace)
+    const { data } = await listCronJob({
+      nameSpace: this.queryParams.nameSpace,
+      podName: this.queryParams.podName
+    })
     if (data.errorCode) {
       this.$message.error(data.errorMessage || '获取数据失败')
       return
